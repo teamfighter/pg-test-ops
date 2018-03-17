@@ -1,0 +1,38 @@
+node 1: HA-node1                                                                                                          
+node 2: HA-node2                                                                                                          
+primitive drbd_pg ocf:linbit:drbd \                                                                                       
+        params drbd_resource=pg \                                                                                         
+        op monitor interval=15 \                                                                                          
+        op start interval=0 timeout=240 \                                                                                 
+        op stop interval=0 timeout=120                                                                                    
+primitive pg_fs Filesystem \                                                                                              
+        params device="/dev/drbd0" directory="/db/pgdata" options="noatime,nodiratime" fstype=xfs \                       
+        op start interval=0 timeout=60 \                                                                                  
+        op stop interval=0 timeout=120 \                                                                                  
+        meta target-role=Started                                                                                          
+primitive pg_lsb lsb:postgresql \                                                                                         
+        op monitor interval=30 timeout=60 \                                                                               
+        op start interval=0 timeout=60 \                                                                                  
+        op stop interval=0 timeout=60                                                                                     
+primitive pg_vip eip \                                                                                                    
+        params elastic_ip=34.243.77.227 \                                                                                 
+        op start timeout=60s interval=0s on-fail=stop \                                                                   
+        op monitor timeout=60s interval=10s on-fail=restart \                                                             
+        op stop timeout=60s interval=0s on-fail=block                                                                     
+group PGServer pg_fs pg_lsb pg_vip \                                                                                      
+        meta target-role=Started                                                                                          
+ms ms_drbd_pg drbd_pg \                                                                                                   
+        meta master-max=1 master-node-max=1 clone-max=2 clone-node-max=1 notify=true                                      
+location cli-prefer-PGServer PGServer role=Started inf: HA-node1                                                          
+colocation col_pg_drbd inf: PGServer ms_drbd_pg:Master                                                                    
+order ord_pg inf: ms_drbd_pg:promote PGServer:start                                                                       
+property cib-bootstrap-options: \                                                                                         
+        have-watchdog=false \                                                                                             
+        dc-version=1.1.14-70404b0 \                                                                                       
+        cluster-infrastructure=corosync \                                                                                 
+        cluster-name=debian \                                                                                             
+        stonith-enabled=false \   
+        no-quorum-policy=ignore \
+        default-resource-stickiness=100 \
+        last-lrm-refresh=1521246651 \
+        crmd-transition-delay=0s   
